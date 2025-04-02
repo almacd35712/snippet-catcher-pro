@@ -1,0 +1,114 @@
+import { google } from "googleapis";
+import credentials from "@/lib/credentials.json";
+
+export default async function handler(req, res) {
+  const { day, exercise } = req.query;
+  if (!day || !exercise) {
+    return res.status(400).json({ error: "Missing day or exercise" });
+  }
+
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+
+    const sheets = google.sheets({ version: "v4", auth });
+    const spreadsheetId = "1kge0xQANIYQyy61Qeh2zsuETfnb0WjIUt3h33byskjA";
+    const sheetName = day === "Abs" ? "Abs Log" : "March/april 2025";
+    const range = `${sheetName}!A:Z`;
+
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+    });
+
+    const rows = result.data.values || [];
+    const normalize = (str) => str?.toLowerCase().replace(/\s+/g, "");
+    const normalizedDay = normalize(day);
+    const normalizedExercise = normalize(exercise);
+
+    // 🔍 Find start of selected day block
+    console.log("🔍 Looking for day block:", normalizedDay);
+
+    for (let i = 0; i < rows.length; i++) {
+      const val = normalize(rows[i][1]);
+      if (val?.startsWith("day") && val.includes(normalizedDay)) {
+        dayStart = i;
+        break;
+      }
+    }    
+
+
+    if (dayStart === -1) {
+      return res.status(404).json({ error: "Day block not found" });
+    }
+
+    // 🔍 Find the exercise row within the day block
+    let exerciseRow = -1;
+    for (let i = dayStart + 1; i < rows.length; i++) {
+      const valB = normalize(rows[i][1]);
+      const valC = normalize(rows[i][2]);
+      if (valB?.startsWith("day")) break; // reached next block
+      if (valB === normalizedExercise || valC === normalizedExercise) {
+        exerciseRow = i;
+        break;
+      }
+    }
+
+    if (exerciseRow === -1) {
+      return res.status(404).json({ error: "Exercise not found" });
+    }
+
+    // 📊 Analyze columns
+    const headerRow = rows[dayStart] || [];
+    const actualCols = headerRow
+      .map((val, idx) => ({ val: val?.toLowerCase(), idx }))
+      .filter((col) => col.val?.includes("actual"))
+      .map((col) => col.idx);
+
+    let setCount = 0;
+    let lastActual = "";
+    let lastWeight = null;
+
+    for (const col of actualCols.reverse()) {
+      for (let i = exerciseRow + 2; i >= exerciseRow; i--) {
+        const cell = rows[i]?.[col];
+        if (cell && !cell.toLowerCase().includes("warm")) {
+          setCount++;
+          if (!lastActual) {
+            lastActual = cell;
+            const match = cell.match(/^(\d+(?:\.\d+)?)\s*x\s*\d+/);
+            if (match) lastWeight = parseFloat(match[1]);
+          }
+        }
+      }
+      if (setCount >= 3) break;
+    }
+
+    const prescribedSet = rows[exerciseRow]?.[actualCols[0] - 1] || "";
+    const suggestedWeight = lastWeight ? Math.round(lastWeight * 1.025) : null;
+
+    // 🧠 Warm-up logic: 40%, 60%, 80% of suggested
+    let warmupSets = [];
+    if (suggestedWeight) {
+      const round5 = (x) => Math.round(x / 5) * 5;
+      warmupSets = [
+        `${round5(suggestedWeight * 0.4)} x 10`,
+        `${round5(suggestedWeight * 0.6)} x 5`,
+        `${round5(suggestedWeight * 0.8)} x 3`,
+      ];
+    }
+
+    return res.status(200).json({
+      setCount,
+      lastActual: lastActual || null,
+      prescribedSet,
+      suggestedWeight,
+      warmupSets,
+    });
+  } catch (err) {
+    console.error("getsetcount error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+}

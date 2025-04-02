@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Snippet Catcher Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      background: #f4f4f4;
+    }
+    h1 {
+      font-size: 1.5rem;
+    }
+    select, textarea, input[type="checkbox"] {
+      margin-bottom: 1rem;
+    }
+    textarea {
+      width: 100%;
+      padding: 0.5rem;
+      font-family: monospace;
+    }
+    .code-area {
+      height: 200px;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      background: #007acc;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:disabled {
+      background: #aaa;
+    }
+    pre {
+      background: #eee;
+      padding: 0.5rem;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>📝 Snippet Catcher Pro</h1>
+
+  <select id="file-select">
+    <option value="">-- Select a file to edit --</option>
+  </select>
+
+  <label>
+    <input type="checkbox" id="replace-mode" />
+    Replace Block Instead of Full File
+  </label>
+
+  <div id="replace-fields" style="display:none;">
+    <h3>🔍 Old Code to Replace:</h3>
+    <textarea id="old-code" class="code-area" placeholder="Paste the code to find..."></textarea>
+
+    <h3>🆕 Replacement Code:</h3>
+    <textarea id="new-code" class="code-area" placeholder="Paste the replacement code..."></textarea>
+  </div>
+
+  <div id="full-replace">
+    <h3>📝 Full File Replace:</h3>
+    <textarea id="snippet" class="code-area" placeholder="Paste your new full code here..."></textarea>
+  </div>
+
+  <button id="apply-btn" disabled>Apply Snippet</button>
+
+  <h3>📄 Original File (Read-Only)</h3>
+  <pre id="file-content">Select a file to view its content here...</pre>
+
+  <script>
+    const fileSelect = document.getElementById("file-select");
+    const applyBtn = document.getElementById("apply-btn");
+    const snippetArea = document.getElementById("snippet");
+    const fileContentPre = document.getElementById("file-content");
+    const replaceMode = document.getElementById("replace-mode");
+    const oldCode = document.getElementById("old-code");
+    const newCode = document.getElementById("new-code");
+    const replaceFields = document.getElementById("replace-fields");
+    const fullReplace = document.getElementById("full-replace");
+
+    let selectedPath = "";
+
+    async function fetchFiles() {
+      const res = await fetch("/api/files");
+      const files = await res.json();
+      fileSelect.innerHTML = '<option value="">-- Select a file to edit --</option>';
+      files.forEach(f => {
+        const option = document.createElement("option");
+        option.value = f;
+        option.textContent = f;
+        fileSelect.appendChild(option);
+      });
+    }
+
+    async function loadFile(path) {
+      const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+      const text = await res.text();
+      fileContentPre.textContent = text;
+      applyBtn.disabled = false;
+    }
+
+    applyBtn.addEventListener("click", async () => {
+      const isReplaceMode = replaceMode.checked;
+
+      const payload = {
+        path: selectedPath
+      };
+
+      if (isReplaceMode) {
+        payload.replaceBlockMode = true;
+        payload.oldBlock = oldCode.value;
+        payload.newBlock = newCode.value;
+      } else {
+        payload.content = snippetArea.value;
+      }
+
+      const res = await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("✅ Snippet applied and backup saved!");
+        loadFile(selectedPath);
+      } else {
+        alert("❌ Failed to save snippet.");
+      }
+    });
+
+    fileSelect.addEventListener("change", () => {
+      selectedPath = fileSelect.value;
+      if (selectedPath) loadFile(selectedPath);
+    });
+
+    replaceMode.addEventListener("change", () => {
+      if (replaceMode.checked) {
+        replaceFields.style.display = "block";
+        fullReplace.style.display = "none";
+      } else {
+        replaceFields.style.display = "none";
+        fullReplace.style.display = "block";
+      }
+    });
+
+    fetchFiles();
+  </script>
+</body>
+</html>

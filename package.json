@@ -1,0 +1,16 @@
+{
+    "name": "snippet-catcher-pro",
+    "version": "1.0.0",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "detect-port": "^1.6.1",
+        "diff": "^7.0.0",
+        "diff2html": "^3.4.51",
+        "esprima": "^4.0.1",
+        "express": "^4.21.2",
+        "prettier": "^3.5.3"
+    }
+}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🧠 Snippet Catcher Pro</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #eee;
+      padding: 1rem;
+    }
+    textarea, select {
+      width: 100%;
+      padding: 10px;
+      margin: 0.5rem 0;
+      font-family: monospace;
+      background: #222;
+      color: #0f0;
+      border: 1px solid #444;
+    }
+    button {
+      margin: 0.5rem 0.25rem;
+      padding: 0.5rem 1rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>💡 Snippet Catcher Pro</h1>
+
+  <label for="fileSelect">Choose a file:</label>
+  <select id="fileSelect">
+    <option>Loading...</option>
+  </select>
+
+  <h2>🔥 Paste GPT Snippet:</h2>
+  <textarea id="gptSnippet" rows="12" placeholder="Paste GPT code here..."></textarea>
+
+  <h3>📋 Instruction (optional):</h3>
+  <textarea id="instruction" rows="4" placeholder="e.g., Add this below the button inside return..."></textarea>
+
+  <div>
+    <button id="applyBtn">💥 Apply Snippet</button>
+    <button id="autoMatchBtn">🤖 Auto Match + Replace</button>
+    <button id="undoBtn">🔄 Undo Last</button>
+  </div>
+
+  <script>
+    // Load file list
+    async function loadFiles() {
+      const res = await fetch("/files");
+      const data = await res.json();
+      const select = document.getElementById("fileSelect");
+      select.innerHTML = "";
+      data.files.forEach(f => {
+        const option = document.createElement("option");
+        option.value = f;
+        option.textContent = f;
+        select.appendChild(option);
+      });
+    }
+
+    // Auto Match Snippet Handler
+    document.getElementById("autoMatchBtn").addEventListener("click", async () => {
+      const path = document.getElementById("fileSelect").value;
+      const code = document.getElementById("gptSnippet").value.trim();
+
+      if (!path || !code) {
+        alert("❗ Please select a file and paste a snippet.");
+        return;
+      }
+
+      const res = await fetch("/auto-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, code })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert("✅ Snippet applied!");
+      } else {
+        alert("❌ Failed to apply snippet: " + (result.error || "Unknown error"));
+      }
+    });
+
+    // Optional: Undo logic
+    document.getElementById("undoBtn").addEventListener("click", async () => {
+      const path = document.getElementById("fileSelect").value;
+      if (!path) return alert("Select a file to undo.");
+      const res = await fetch("/undo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path })
+      });
+      const result = await res.json();
+      alert(result.success ? "✅ Undo successful." : "❌ Undo failed.");
+    });
+
+    loadFiles();
+  </script>
+</body>
+</html>
