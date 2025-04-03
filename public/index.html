@@ -3,102 +3,144 @@
 <head>
   <meta charset="UTF-8" />
   <title>🧠 Snippet Catcher Pro</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
   <style>
     body {
-      font-family: sans-serif;
-      background: #111;
+      font-family: monospace;
+      background-color: #121212;
       color: #eee;
-      padding: 1rem;
+      padding: 1.5rem;
     }
     textarea, select {
       width: 100%;
-      padding: 10px;
-      margin: 0.5rem 0;
-      font-family: monospace;
-      background: #222;
+      margin-top: 10px;
+      background: #1e1e1e;
       color: #0f0;
-      border: 1px solid #444;
+      border: 1px solid #333;
+      padding: 10px;
+      font-size: 14px;
     }
     button {
-      margin: 0.5rem 0.25rem;
-      padding: 0.5rem 1rem;
+      background-color: #00cc66;
+      border: none;
+      color: black;
       font-weight: bold;
+      padding: 8px 16px;
+      margin: 10px 10px 0 0;
+      cursor: pointer;
+    }
+    #toast {
+      visibility: hidden;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: #22c55e;
+      color: white;
+      padding: 10px 18px;
+      font-weight: bold;
+      border-radius: 6px;
+      z-index: 9999;
+      transition: opacity 0.5s ease-in-out;
+      opacity: 0;
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+    #diff {
+      margin-top: 2rem;
     }
   </style>
 </head>
 <body>
-  <h1>💡 Snippet Catcher Pro</h1>
 
-  <label for="fileSelect">Choose a file:</label>
-  <select id="fileSelect">
-    <option>Loading...</option>
-  </select>
+  <h1>🧠 Snippet Catcher Pro</h1>
 
-  <h2>🔥 Paste GPT Snippet:</h2>
-  <textarea id="gptSnippet" rows="12" placeholder="Paste GPT code here..."></textarea>
+  <label for="fileSelect">📂 Select File:</label>
+  <select id="fileSelect"><option>Loading...</option></select>
 
-  <h3>📋 Instruction (optional):</h3>
-  <textarea id="instruction" rows="4" placeholder="e.g., Add this below the button inside return..."></textarea>
+  <label for="gptSnippet">📋 GPT Snippet:</label>
+  <textarea id="gptSnippet" rows="10" placeholder="Paste GPT snippet here..."></textarea>
+
+  <label for="instruction">🧠 Instruction (optional):</label>
+  <textarea id="instruction" rows="3" placeholder="e.g. Replace inside for loop"></textarea>
 
   <div>
-    <button id="applyBtn">💥 Apply Snippet</button>
-    <button id="autoMatchBtn">🤖 Auto Match + Replace</button>
-    <button id="undoBtn">🔄 Undo Last</button>
+    <button id="applyBtn">🤖 Auto Match + Replace</button>
+    <button id="clearBtn">🧹 Clear</button>
   </div>
 
+  <div id="toast">✅ Snippet Applied!</div>
+  <div id="diff"></div>
+
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
+
   <script>
-    // Load file list
     async function loadFiles() {
       const res = await fetch("/files");
       const data = await res.json();
       const select = document.getElementById("fileSelect");
       select.innerHTML = "";
-      data.files.forEach(f => {
-        const option = document.createElement("option");
-        option.value = f;
-        option.textContent = f;
-        select.appendChild(option);
+      data.files.forEach(file => {
+        const opt = document.createElement("option");
+        opt.value = file;
+        opt.textContent = file;
+        select.appendChild(opt);
       });
     }
 
-    // Auto Match Snippet Handler
-    document.getElementById("autoMatchBtn").addEventListener("click", async () => {
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    function showDiff(oldCode, newCode) {
+      const patch = Diff.createTwoFilesPatch("Original", "Updated", oldCode, newCode);
+      const diffHtml = Diff2Html.html(patch, {
+        drawFileList: false,
+        outputFormat: "side-by-side",
+        matching: "lines"
+      });
+      document.getElementById("diff").innerHTML = diffHtml;
+    }
+
+    document.getElementById("applyBtn").addEventListener("click", async () => {
       const path = document.getElementById("fileSelect").value;
       const code = document.getElementById("gptSnippet").value.trim();
+      const instruction = document.getElementById("instruction").value.trim();
 
       if (!path || !code) {
-        alert("❗ Please select a file and paste a snippet.");
+        alert("Please select a file and paste a valid snippet.");
         return;
       }
 
       const res = await fetch("/auto-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, code })
+        body: JSON.stringify({ path, code, instruction })
       });
 
       const result = await res.json();
       if (result.success) {
-        alert("✅ Snippet applied!");
+        showToast("✅ Snippet applied successfully!");
+        showDiff(result.original, result.updated);
       } else {
-        alert("❌ Failed to apply snippet: " + (result.error || "Unknown error"));
+        alert("❌ Failed: " + (result.error || "unknown error"));
       }
     });
 
-    // Optional: Undo logic
-    document.getElementById("undoBtn").addEventListener("click", async () => {
-      const path = document.getElementById("fileSelect").value;
-      if (!path) return alert("Select a file to undo.");
-      const res = await fetch("/undo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path })
-      });
-      const result = await res.json();
-      alert(result.success ? "✅ Undo successful." : "❌ Undo failed.");
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      document.getElementById("gptSnippet").value = "";
+      document.getElementById("instruction").value = "";
+      document.getElementById("diff").innerHTML = "";
     });
 
     loadFiles();
   </script>
+
 </body>
 </html>
