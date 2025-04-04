@@ -1,19 +1,19 @@
 const fs = require("fs");
 
-let lastBackup = null;
-
-function revertLastChange() {
-  if (!lastBackup || !fs.existsSync(lastBackup.path)) {
-    throw new Error("No backup available.");
-  }
-  fs.writeFileSync(lastBackup.path, lastBackup.content);
-}
+let lastBackup = {};
 
 function saveBackup(filePath) {
-  lastBackup = {
-    path: filePath,
-    content: fs.readFileSync(filePath, "utf8"),
-  };
+  if (fs.existsSync(filePath)) {
+    lastBackup[filePath] = fs.readFileSync(filePath, "utf8");
+  }
 }
 
-module.exports = { revertLastChange, saveBackup };
+function revertLastChange(filePath) {
+  if (lastBackup[filePath]) {
+    fs.writeFileSync(filePath, lastBackup[filePath], "utf8");
+    return true;
+  }
+  return false;
+}
+
+module.exports = { saveBackup, revertLastChange };

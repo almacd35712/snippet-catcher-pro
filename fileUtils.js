@@ -1,27 +1,27 @@
-const fs = require("fs");
-const path = require("path");
+app.get("/files", (req, res) => {
+  try {
+    const allowedDirs = [
+      path.join(BASE_DIR, "lib"),
+      path.join(BASE_DIR, "pages"),
+    ];
 
-function getAllJsFiles(baseDir) {
-  const result = [];
+    const envFile = path.join(BASE_DIR, ".env.local");
+    let files = [];
 
-  function walk(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      const relPath = path
-        .relative(baseDir, fullPath)
-        .replace(/\\/g, "/");
-
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (relPath.endsWith(".js") || relPath.endsWith(".ts")) {
-        result.push(relPath);
+    for (const dir of allowedDirs) {
+      if (fs.existsSync(dir)) {
+        files.push(...getAllJsFiles(dir).map(f => path.relative(BASE_DIR, path.join(dir, f)).replace(/\\/g, "/")));
       }
     }
+
+    if (fs.existsSync(envFile)) {
+      files.push(".env.local");
+    }
+
+    console.log("📂 Filtered Files:", files.length);
+    res.json({ files });
+  } catch (err) {
+    console.error("Error filtering files:", err);
+    res.status(500).json({ error: "Failed to list files" });
   }
-
-  walk(baseDir);
-  return result;
-}
-
-module.exports = { getAllJsFiles };
+});

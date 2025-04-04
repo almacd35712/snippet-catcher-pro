@@ -6,9 +6,10 @@
         "start": "node server.js"
     },
     "dependencies": {
+        "chalk": "^5.4.1",
         "detect-port": "^1.6.1",
-        "diff": "^7.0.0",
-        "diff2html": "^3.4.51",
+        "diff": "^5.1.0",
+        "diff2html": "^3.4.16",
         "esprima": "^4.0.1",
         "express": "^4.21.2",
         "prettier": "^3.5.3"
